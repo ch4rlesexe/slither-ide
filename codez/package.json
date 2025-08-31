@@ -1,0 +1,16 @@
+{
+  "name": "slither-electron",
+  "version": "0.1.0",
+  "description": "A fake IDE with a Slither button instead of Run.",
+  "main": "main.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "electron ."
+  },
+  "devDependencies": {
+    "electron": "^31.0.0"
+  },
+  "dependencies": {
+    "monaco-editor": "^0.49.0"
+  }
+}

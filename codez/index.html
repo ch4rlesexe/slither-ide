@@ -1,0 +1,272 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <title>Slither IDE</title>
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';">
+  <style>
+    /* CSS Variables */
+    :root {
+      --bg: #1e1e1e;           /* Main background*/
+      --panel: #252526;         /* Toolbar background*/
+      --border: #3c3c3c;        
+      --text: #cccccc;          
+      --accent: #007acc;        
+    }
+    
+    /* Reset all margins and padding, use border-box sizing */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+        html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      overflow: hidden;  
+    }
+    
+    #app {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;  /* Full viewport height */
+    }
+    
+    #toolbar {
+      height: 50px;
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;      
+      padding: 0 20px;
+      gap: 15px;
+    }
+    
+    /* Button styling - the main Slither button */
+    button {
+      background: var(--accent);
+      color: white;
+      border: 0;
+      padding: 10px 20px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+    }
+    
+    /* Button hover effect - slightly darker blue when you hover */
+    button:hover {
+      background: #1a8fd1;
+    }
+    
+    /* Content area - contains the editor and output panel */
+    #content {
+      flex: 1;                  /* Take up remaining space after toolbar */
+      display: flex;
+      flex-direction: column;   /* Stack editor above output */
+      height: calc(100vh - 50px);  /* Subtract toolbar height from total */
+    }
+    
+    /* Monaco editor container - the main code editing area */
+    #editor {
+      flex: 1;
+      position: relative;
+      min-height: 0;           
+    }
+    
+    /* Output panel - shows Python execution results at the bottom */
+    #output {
+      height: 200px;
+      background: #1e1e1e;
+      border-top: 1px solid #3c3c3c;
+      padding: 15px;
+      font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+      font-size: 13px;
+      overflow-y: auto;
+      display: block;
+      color: #cccccc;
+      flex-shrink: 0;
+    }
+    
+    .output-line {
+      margin-bottom: 8px;
+      white-space: pre-wrap;
+    }
+    
+    .output-error {
+      color: #f48771;
+    }
+    
+    .output-success {
+      color: #89d185;
+    }
+    
+    .monaco-editor {
+      padding-top: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div id="toolbar">
+      <button id="slither">🐍 Slither</button>
+    </div>
+    
+    <div id="content">
+      <div id="editor"></div>
+      <div id="output">Output will appear here when you click Slither...</div>
+    </div>
+  </div>
+
+  <!-- Load Monaco Editor -->
+  <script src="node_modules/monaco-editor/min/vs/loader.js"></script>
+  <script>
+    // Configure Monaco Editor to load from the correct path
+    require.config({ paths: { 'vs': 'node_modules/monaco-editor/min/vs' }});
+    
+    require(['vs/editor/editor.main'], function() {
+      
+      // Create the Monaco editor instance
+      const editor = monaco.editor.create(document.getElementById('editor'), {
+        // Initial Python code that users see when they first open the IDE
+        value: `# Welcome to Slither IDE!
+
+# Regular print statements
+print("Hello, World!")
+
+HelloWorld("print")  # This will print "Hello World"
+
+`,
+        language: 'python',          // Enable Python syntax highlighting
+        theme: 'vs-dark',            // Dark theme to match VS Code
+        fontSize: 14,                // Comfortable font size for coding
+        minimap: { enabled: true },  // Show the minimap on the right
+        automaticLayout: true,       // Resize editor when window changes
+        scrollBeyondLastLine: false, // Don't scroll past the last line
+        roundedSelection: false,     // Sharp selection borders
+        readOnly: false,             // Allow editing (not read-only)
+        cursorStyle: 'line',         // Line cursor instead of block
+        wordWrap: 'on'               // Wrap long lines
+      });
+
+      // Get reference to the output panel - this is where we'll show Python execution results
+      const output = document.getElementById('output');
+      
+      // Main function that "executes" Python code
+      function runPythonCode() {
+        // Get the current code from the editor
+        const code = editor.getValue();
+        
+        // Clear previous output
+        output.innerHTML = '';
+        
+        // Split the code into individual lines for processing
+        const lines = code.split('\n');
+        let outputLines = []; // collect all output lines
+        
+        // Add a header to show execution started
+        outputLines.push('<div class="output-line output-success">=== Python Code Execution ===</div>');
+        
+        // Look for lines that start with 'print(' or 'HelloWorld('
+        const linesWithPrint = lines.filter(line => {
+          const trimmed = line.trim();
+          return trimmed.startsWith('print(') || trimmed.startsWith('HelloWorld(');
+        });
+        
+        // If there are any executable statements\ process them
+        if (linesWithPrint.length > 0) {
+          
+          // Go through each line and "execute" it
+          linesWithPrint.forEach(line => {
+            try {
+              
+              // Check if this is a HelloWorld statement
+              if (line.trim().startsWith('HelloWorld(')) {
+                
+                // Handle HelloWorld("print")
+                // When someone writes HelloWorld("print"), show "Hello World"
+                const match = line.match(/HelloWorld\("([^"]+)"\)/);
+                if (match) {
+                  const content = match[1];  // Extract what's inside the quotes
+                  if (content === "print") {
+                    outputLines.push('<div class="output-line">Hello World</div>');
+                  } else {
+                    // For any other string, show "Hello [string]"
+                    outputLines.push(`<div class="output-line">Hello ${content}</div>`);
+                  }
+                } else {
+                  // Handle HelloWorld() without quotes (fallback)
+                  const match2 = line.match(/HelloWorld\(([^)]+)\)/);
+                  if (match2) {
+                    const content = match2[1];
+                    if (content === "print") {
+                      outputLines.push('<div class="output-line">Hello World</div>');
+                    } else {
+                      outputLines.push(`<div class="output-line">Hello ${content}</div>`);
+                    }
+                  }
+                }
+                
+              } else if (line.trim().startsWith('print(')) {
+                // Handle regular print statements
+                const match = line.match(/print\((.*)\)/);
+                if (match) {
+                  const content = match[1];  // Extract inside of print()
+                  
+                  // Handle different types of print content
+                  if (content.includes('"') || content.includes("'")) {
+                    // Just show literal
+                    const cleanContent = content.replace(/['"]/g, '');
+                    outputLines.push(`<div class="output-line">${cleanContent}</div>`);
+                  } else if (content.includes('f"') || content.includes("f'")) {
+                    // Remove f string and quotes
+                    const cleanContent = content.replace(/f['"]/g, '').replace(/['"]/g, '');
+                    outputLines.push(`<div class="output-line">${cleanContent}</div>`);
+                  } else {
+                    // Just show the content as is
+                    outputLines.push(`<div class="output-line">${content}</div>`);
+                  }
+                }
+              }
+              
+            } catch (e) {
+              // If anything goes wrong while processing a line, show an error
+              outputLines.push(`<div class="output-line output-error">Error in statement: ${e.message}</div>`);
+            }
+          });
+          
+          // Add success message when all statements are processed
+          outputLines.push('<div class="output-line output-success">Code executed successfully! 🐍</div>');
+          
+        } else {
+          // No executable statements found
+          outputLines.push('<div class="output-line">No print or HelloWorld statements found in code.</div>');
+          outputLines.push('<div class="output-line">Add print() or HelloWorld() statements to see output.</div>');
+        }
+        
+        // Add "Finished in 0.1s" since we don't have a real execution time
+        outputLines.push('<div class="output-line">[Finished in 0.1s]</div>');
+        
+        // Put all our output lines into the output panel
+        output.innerHTML = outputLines.join('');
+        
+        // Scroll to the bottom so users can see the latest output
+        output.scrollTop = output.scrollHeight;
+      }
+
+      // Connect the Slither button to execution function
+      document.getElementById('slither').addEventListener('click', runPythonCode);
+
+      // F5 will also trigger code execution like in vscode
+      window.addEventListener('keydown', (e) => {
+        if (e.key === 'F5') {
+          e.preventDefault();        // Prevent browser refresh
+          runPythonCode();
+        }
+      });
+    });
+  </script>
+</body>
+</html>
